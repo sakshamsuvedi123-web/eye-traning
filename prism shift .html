@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual-Core Dynamic Trainer - Final Edition</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            user-select: none;
+        }
+        body {
+            background-color: #030712;
+            color: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 850px;
+            height: 600px;
+            background: linear-gradient(135deg, #0b0f19 0%, #030712 100%);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.1);
+        }
+        canvas {
+            display: block;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 30;
+            pointer-events: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .hud-item {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: auto;
+        }
+        .hud-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            pointer-events: auto;
+        }
+        .action-btn {
+            background: #374151;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .action-btn:hover { background: #4b5563; }
+        .dev-btn { background: #ef4444; }
+        .dev-btn:hover { background: #f87171; }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(3, 7, 18, 0.92);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+        .hidden { opacity: 0; pointer-events: none; }
+        
+        h1 {
+            font-size: 2.6rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+            text-align: center;
+        }
+        p {
+            font-size: 1rem;
+            color: #9ca3af;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 520px;
+            line-height: 1.5;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            background: linear-gradient(135deg, #0284c7 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(124, 58, 237, 0.6); }
+        .btn-secondary { background: #374151; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-danger { background: #ef4444; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+        .btn-danger:hover { background: #f87171; }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 7, 18, 0.95);
+            backdrop-filter: blur(10px); z-index: 40;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay h2 { color: #38bdf8; margin-bottom: 15px; font-size: 2rem; }
+        .level-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 550px; margin-bottom: 20px; max-height: 350px; overflow-y: auto; padding: 5px;
+        }
+        .level-chip {
+            background: #1f2937; border: 1px solid #374151; color: #f3f4f6;
+            padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold;
+            transition: all 0.2s;
+        }
+        .level-chip:hover { background: #374151; border-color: #ef4444; }
+
+        #instructions-box {
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; text-align: left;
+        }
+        #instructions-box ul { list-style-type: none; color: #9ca3af; font-size: 0.9rem; line-height: 1.6; }
+        #instructions-box li::before { content: "• "; color: #38bdf8; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD Overlay -->
+        <div id="hud">
+            <div class="hud-item">Level: <span id="level-val">1</span>/20 | Mode: <span id="mode-name" style="color: #38bdf8;">PRISM MATRIX</span></div>
+            <div class="hud-item" id="status-msg" style="color: #38bdf8;">MATCH THE RULE</div>
+            <div class="hud-buttons">
+                <div class="hud-item" style="padding: 6px 12px;">Score: <span id="score-val">0</span></div>
+                <button class="action-btn" onclick="togglePauseMenu()">II</button>
+                <button class="action-btn dev-btn" onclick="requestDevAccess()">DEV</button>
+            </div>
+        </div>
+
+        <!-- Developer Teleport Modal -->
+        <div id="dev-modal" class="modal-overlay hidden">
+            <h2>DEVELOPER TELEPORT</h2>
+            <p>Password verified. Select any level to jump directly:</p>
+            <div class="level-grid" id="level-grid-container"></div>
+            <button class="btn btn-secondary" onclick="closeDevPanel()">RESUME GAME</button>
+        </div>
+
+        <!-- In-Game Pause Menu Modal -->
+        <div id="pause-modal" class="modal-overlay hidden">
+            <h2>GAME PAUSED</h2>
+            <div style="display: flex; flex-direction: column; gap: 12px; width: 250px;">
+                <button class="btn" onclick="togglePauseMenu()">RESUME</button>
+                <button class="btn btn-secondary" onclick="openDevFromPause()">DEV MENU</button>
+                <button class="btn btn-danger" onclick="returnToMainMenu()">QUIT TO MENU</button>
+            </div>
+        </div>
+
+        <!-- Screen Overlay -->
+        <div id="screen-overlay" class="ui-overlay">
+            <h1 id="screen-title">DUAL-CORE DYNAMIC TRAINER</h1>
+            <p id="screen-desc">Alternating 20-level campaign with secure passcode protection (`190309`)!</p>
+            
+            <div id="instructions-box">
+                <ul>
+                    <li><strong>Levels 1-19:</strong> Beating a level shows Next Level / Restart / Quit.</li>
+                    <li><strong>Level 20 Victory:</strong> Beating the final level shows Restart (to menu) / Quit.</li>
+                    <li><strong>Secure Dev Mode:</strong> Passcode `190309`.</li>
+                </ul>
+            </div>
+
+            <div class="btn-group" id="menu-btn-group">
+                <button id="start-btn" class="btn" onclick="startGame()">START CAMPAIGN</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="850" height="600"></canvas>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const scoreValEl = document.getElementById('score-val');
+const levelValEl = document.getElementById('level-val');
+const modeNameEl = document.getElementById('mode-name');
+const statusMsgEl = document.getElementById('status-msg');
+const screenOverlay = document.getElementById('screen-overlay');
+const screenTitle = document.getElementById('screen-title');
+const screenDesc = document.getElementById('screen-desc');
+const menuBtnGroup = document.getElementById('menu-btn-group');
+const instructionsBox = document.getElementById('instructions-box');
+const devModal = document.getElementById('dev-modal');
+const pauseModal = document.getElementById('pause-modal');
+const levelGridContainer = document.getElementById('level-grid-container');
+
+let level = 1;
+let score = 0;
+let lives = 3;
+let gameMode = 'PRISM';
+let subState = 'PLAYING';
+
+const COLORS = [
+    { name: 'RED', hex: '#ff5555' },
+    { name: 'BLUE', hex: '#38bdf8' },
+    { name: 'GREEN', hex: '#34d399' },
+    { name: 'YELLOW', hex: '#fbbf24' }
+];
+let prismBeams = [];
+let prismSpawnTimer = 0;
+let currentRule = 'INK';
+let ruleTimer = 0;
+let prismNodes = [
+    { id: 0, x: 160, y: 150, active: false },
+    { id: 1, x: 690, y: 150, active: false },
+    { id: 2, x: 160, y: 450, active: false },
+    { id: 3, x: 690, y: 450, active: false },
+    { id: 4, x: 425, y: 110, active: false },
+    { id: 5, x: 425, y: 490, active: false }
+];
+
+const CUP_COLORS = ['#38bdf8', '#818cf8', '#c084fc', '#34d399', '#fbbf24', '#f43f5e'];
+let cups = [];
+let cupSwapsRemaining = 0;
+let cupShuffleTimer = 0;
+
+function buildDevGrid() {
+    levelGridContainer.innerHTML = '';
+    for (let i = 1; i <= 20; i++) {
+        const chip = document.createElement('div');
+        chip.className = 'level-chip';
+        const type = i % 2 !== 0 ? 'Prism' : 'Cup';
+        chip.textContent = `LVL ${i} (${type})`;
+        chip.onclick = () => teleportToLevel(i);
+        levelGridContainer.appendChild(chip);
+    }
+}
+buildDevGrid();
+
+function requestDevAccess() {
+    const pwd = prompt("Enter Developer Password:");
+    if (pwd === "190309") {
+        pauseModal.classList.add('hidden');
+        devModal.classList.remove('hidden');
+    } else if (pwd !== null) {
+        alert("Incorrect Password!");
+    }
+}
+
+function closeDevPanel() { devModal.classList.add('hidden'); }
+function openDevFromPause() { pauseModal.classList.add('hidden'); requestDevAccess(); }
+
+function togglePauseMenu() {
+    if (screenOverlay.classList.contains('hidden')) {
+        if (subState === 'PAUSED') {
+            subState = 'PLAYING';
+            pauseModal.classList.add('hidden');
+        } else {
+            subState = 'PAUSED';
+            pauseModal.classList.remove('hidden');
+        }
+    }
+}
+
+function returnToMainMenu() {
+    pauseModal.classList.add('hidden');
+    devModal.classList.add('hidden');
+    screenTitle.textContent = "DUAL-CORE DYNAMIC TRAINER";
+    screenDesc.textContent = "Alternating 20-level campaign with secure passcode protection (`190309`)!";
+    instructionsBox.style.display = 'block';
+    
+    menuBtnGroup.innerHTML = `<button class="btn" onclick="startGame()">START CAMPAIGN</button>`;
+    screenOverlay.classList.remove('hidden');
+}
+
+function teleportToLevel(targetLevel) {
+    level = targetLevel;
+    closeDevPanel();
+    pauseModal.classList.add('hidden');
+    screenOverlay.classList.add('hidden');
+    initLevel();
+}
+
+function updateModeUI() {
+    const isPrism = level % 2 !== 0;
+    gameMode = isPrism ? 'PRISM' : 'CUP';
+    modeNameEl.textContent = isPrism ? `PRISM MATRIX (L${level})` : `CUP SHUFFLE (L${level})` ;
+    modeNameEl.style.color = isPrism ? '#38bdf8' : '#c084fc';
+}
+
+function startGame() {
+    level = 1;
+    score = 0;
+    lives = 3;
+    scoreValEl.textContent = score;
+    levelValEl.textContent = level;
+    screenOverlay.classList.add('hidden');
+    initLevel();
+}
+
+function tryAgainLevel() {
+    if (level > 5) {
+        level = 6;
+        score = 100;
+    }
+    screenOverlay.classList.add('hidden');
+    initLevel();
+}
+
+function initLevel() {
+    levelValEl.textContent = level;
+    updateModeUI();
+
+    if (gameMode === 'PRISM') {
+        subState = 'PLAYING';
+        prismBeams = [];
+        prismSpawnTimer = 0;
+        ruleTimer = 0;
+        currentRule = 'INK';
+        statusMsgEl.textContent = "RULE: MATCH INK";
+        statusMsgEl.style.color = '#38bdf8';
+    } else {
+        subState = 'PREVIEW';
+        statusMsgEl.textContent = "WATCH THE SINGLE BALL";
+        statusMsgEl.style.color = '#c084fc';
+        
+        const numCups = Math.min(6, 3 + Math.floor((level - 2) / 4));
+        cups = [];
+        const spacing = canvas.width / (numCups + 1);
+        let shuffledColors = [...CUP_COLORS].sort(() => Math.random() - 0.5);
+
+        for (let i = 0; i < numCups; i++) {
+            cups.push({
+                id: i,
+                x: spacing * (i + 1),
+                y: 460,
+                targetX: spacing * (i + 1),
+                targetY: 460,
+                startX: spacing * (i + 1),
+                startY: 460,
+                hasBall: i === 0,
+                color: shuffledColors[i],
+                lift: 0
+            });
+        }
+
+        let elapsed = 0;
+        const showInterval = setInterval(() => {
+            if (subState === 'PAUSED') return;
+            elapsed += 100;
+            if (cups[0].lift < 35) cups[0].lift += 5;
+            if (elapsed >= 1200) {
+                clearInterval(showInterval);
+                const hideInterval = setInterval(() => {
+                    if (subState === 'PAUSED') return;
+                    if (cups[0].lift > 0) cups[0].lift -= 5;
+                    if (cups[0].lift <= 0) {
+                        clearInterval(hideInterval);
+                        setTimeout(() => startCupShufflePhase(), 400);
+                    }
+                }, 30);
+            }
+        }, 100);
+    }
+}
+
+function startCupShufflePhase() {
+    subState = 'SHUFFLING';
+    statusMsgEl.textContent = "SHUFFLING CUPS...";
+    statusMsgEl.style.color = '#38bdf8';
+    cupSwapsRemaining = 3 + Math.floor(level / 2);
+    pickNextCupSwap();
+}
+
+function pickNextCupSwap() {
+    if (cupSwapsRemaining <= 0) {
+        finishCupShuffle();
+        return;
+    }
+    cupSwapsRemaining--;
+
+    const numCups = cups.length;
+    let idx1 = Math.floor(Math.random() * numCups);
+    let idx2;
+    do { idx2 = Math.floor(Math.random() * numCups); } while (idx2 === idx1);
+
+    const c1 = cups[idx1];
+    const c2 = cups[idx2];
+
+    c1.startX = c1.x; c1.startY = c1.y;
+    c2.startX = c2.x; c2.startY = c2.y;
+    c1.targetX = c2.startX; c1.targetY = c2.startY;
+    c2.targetX = c1.startX; c2.targetY = c1.startY;
+    cupShuffleTimer = 0;
+}
+
+function finishCupShuffle() {
+    subState = 'ALIGNING';
+    statusMsgEl.textContent = "LOCKING POSITIONS...";
+    statusMsgEl.style.color = '#34d399';
+
+    const spacing = canvas.width / (cups.length + 1);
+    let targetSlots = [];
+    for (let i = 0; i < cups.length; i++) targetSlots.push(spacing * (i + 1));
+    targetSlots.sort(() => Math.random() - 0.5);
+
+    cups.forEach((c, i) => {
+        c.startX = c.x; c.startY = c.y;
+        c.targetX = targetSlots[i]; c.targetY = 460;
+    });
+    cupShuffleTimer = 0;
+}
+
+canvas.addEventListener('click', (e) => {
+    if (subState === 'PAUSED') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (gameMode === 'PRISM' && subState === 'PLAYING') {
+        prismNodes.forEach(node => {
+            const dist = Math.hypot(mouseX - node.x, mouseY - node.y);
+            if (dist < 32) {
+                const index = prismBeams.findIndex(b => b.nodeId === node.id);
+                if (index !== -1) {
+                    prismBeams.splice(index, 1);
+                    score += 15;
+                    scoreValEl.textContent = score;
+                    node.active = true;
+                    setTimeout(() => node.active = false, 150);
+
+                    if (score >= level * 60) {
+                        winLevel();
+                    }
+                }
+            }
+        });
+    } else if (gameMode === 'CUP' && subState === 'CHOOSING') {
+        cups.forEach(cup => {
+            const dist = Math.hypot(mouseX - cup.x, mouseY - (cup.y - 15));
+            if (dist < 40) {
+                evaluateCupChoice(cup);
+            }
+        });
+    }
+});
+
+function evaluateCupChoice(selectedCup) {
+    subState = 'REVEALING';
+    let liftVal = 0;
+    const revealInterval = setInterval(() => {
+        liftVal += 5;
+        selectedCup.lift = liftVal;
+        if (liftVal >= 45) {
+            clearInterval(revealInterval);
+            if (selectedCup.hasBall) {
+                score += 30 * level;
+                scoreValEl.textContent = score;
+                statusMsgEl.textContent = "CORRECT!";
+                statusMsgEl.style.color = '#34d399';
+                setTimeout(() => winLevel(), 1200);
+            } else {
+                statusMsgEl.textContent = "WRONG CUP!";
+                statusMsgEl.style.color = '#f87171';
+                cups.forEach(c => { if (c.hasBall) c.lift = 45; });
+                setTimeout(() => gameOver("Wrong cup chosen!"), 1800);
+            }
+        }
+    }, 30);
+}
+
+function winLevel() {
+    subState = 'WIN';
+    instructionsBox.style.display = 'none';
+
+    // If it's the final level (20th level), show exactly 2 buttons: Restart (to menu) and Quit
+    if (level >= 20) {
+        screenTitle.textContent = "CAMPAIGN VICTORY!";
+        screenDesc.innerHTML = `Congratulations! You completed all 20 levels!<br>Final Score: <strong>${score}</strong>`;
+        menuBtnGroup.innerHTML = `
+            <button class="btn btn-secondary" onclick="returnToMainMenu()">RESTART</button>
+            <button class="btn btn-danger" onclick="returnToMainMenu()">QUIT</button>
+        `;
+    } else {
+        // For levels 1 to 19, keep Next Level, Restart, and Quit
+        screenTitle.textContent = `LEVEL ${level} COMPLETE!`;
+        screenDesc.innerHTML = `Great job! Score: <strong>${score}</strong>`;
+        menuBtnGroup.innerHTML = `
+            <button class="btn" onclick="advanceLevel()">NEXT LEVEL</button>
+            <button class="btn btn-secondary" onclick="returnToMainMenu()">RESTART</button>
+            <button class="btn btn-danger" onclick="returnToMainMenu()">QUIT</button>
+        `;
+    }
+    screenOverlay.classList.remove('hidden');
+}
+
+function advanceLevel() {
+    level++;
+    if (level > 20) {
+        winLevel();
+        return;
+    }
+    screenOverlay.classList.add('hidden');
+    initLevel();
+}
+
+function gameOver(message) {
+    subState = 'GAMEOVER';
+    screenTitle.textContent = "DEFEAT / TRY AGAIN";
+    screenDesc.innerHTML = `${message}<br>Reached Level <strong>${level}</strong>/20 | Score: <strong>${score}</strong>`;
+    instructionsBox.style.display = 'none';
+
+    if (level <= 5) {
+        menuBtnGroup.innerHTML = `
+            <button class="btn" onclick="tryAgainLevel()">TRY AGAIN</button>
+            <button class="btn btn-danger" onclick="returnToMainMenu()">QUIT</button>
+        `;
+    } else {
+        menuBtnGroup.innerHTML = `
+            <button class="btn" onclick="tryAgainLevel()">TRY AGAIN</button>
+            <button class="btn btn-secondary" onclick="tryAgainLevel()">RESTART</button>
+            <button class="btn btn-danger" onclick="returnToMainMenu()">QUIT</button>
+        `;
+    }
+    screenOverlay.classList.remove('hidden');
+}
+
+function updatePrism(dt) {
+    if (subState === 'PAUSED') return;
+
+    ruleTimer += dt;
+    if (ruleTimer >= 10000) {
+        ruleTimer = 0;
+        currentRule = currentRule === 'INK' ? 'WORD' : 'INK';
+        statusMsgEl.textContent = `RULE: MATCH ${currentRule}`;
+        statusMsgEl.style.color = currentRule === 'INK' ? '#38bdf8' : '#fbbf24';
+    }
+
+    prismSpawnTimer += dt;
+    const spawnRate = Math.max(1200, 2800 - (level * 80));
+    if (prismSpawnTimer >= spawnRate) {
+        prismSpawnTimer = 0;
+        const targetNode = prismNodes[Math.floor(Math.random() * prismNodes.length)];
+        const inkColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+        let wordColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+        if (Math.random() < 0.6) {
+            while (wordColor.name === inkColor.name) {
+                wordColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+            }
+        }
+        const speed = 1.0 + (level * 0.1);
+        prismBeams.push({
+            x: targetNode.x, y: targetNode.y,
+            currentX: targetNode.x, currentY: targetNode.y,
+            targetX: canvas.width / 2, targetY: canvas.height / 2,
+            speed: speed, ink: inkColor, word: wordColor, nodeId: targetNode.id
+        });
+    }
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    for (let i = prismBeams.length - 1; i >= 0; i--) {
+        let b = prismBeams[i];
+        const angle = Math.atan2(b.targetY - b.currentY, b.targetX - b.currentX);
+        b.currentX += Math.cos(angle) * b.speed;
+        b.currentY += Math.sin(angle) * b.speed;
+
+        if (Math.hypot(b.currentX - centerX, b.currentY - centerY) < 25) {
+            prismBeams.splice(i, 1);
+            lives--;
+            if (lives <= 0) {
+                gameOver("Core breached!");
+            }
+        }
+    }
+}
+
+function updateCups(dt) {
+    if (subState === 'PAUSED') return;
+
+    if (subState === 'SHUFFLING') {
+        cupShuffleTimer += 0.03 + (level * 0.002);
+        if (cupShuffleTimer >= 1) {
+            cupShuffleTimer = 1;
+            cups.forEach(c => { c.x = c.targetX; c.y = c.targetY; });
+            setTimeout(pickNextCupSwap, 100);
+        } else {
+            cups.forEach(c => {
+                c.x = c.startX + (c.targetX - c.startX) * cupShuffleTimer;
+                c.y = c.startY + (c.targetY - c.startY) * cupShuffleTimer;
+            });
+        }
+    } else if (subState === 'ALIGNING') {
+        cupShuffleTimer += 0.04;
+        if (cupShuffleTimer >= 1) {
+            cupShuffleTimer = 1;
+            cups.forEach(c => { c.x = c.targetX; c.y = c.targetY; c.lift = 0; });
+            subState = 'CHOOSING';
+            statusMsgEl.textContent = "SELECT THE CUP WITH THE BALL!";
+            statusMsgEl.style.color = '#34d399';
+        } else {
+            cups.forEach(c => {
+                c.x = c.startX + (c.targetX - c.startX) * cupShuffleTimer;
+                c.y = c.startY + (c.targetY - c.startY) * cupShuffleTimer;
+            });
+        }
+    }
+}
+
+let lastTime = 0;
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const dt = timestamp - lastTime;
+    lastTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    if (screenOverlay.classList.contains('hidden') && devModal.classList.contains('hidden') && pauseModal.classList.contains('hidden')) {
+        if (gameMode === 'PRISM') {
+            updatePrism(dt);
+            drawPrism();
+        } else {
+            updateCups(dt);
+            drawCups();
+        }
+    } else if (subState === 'PAUSED') {
+        if (gameMode === 'PRISM') drawPrism();
+        else drawCups();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function drawPrism() {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 22, 0, Math.PI * 2);
+    ctx.fillStyle = '#111827';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fill();
+
+    prismNodes.forEach(node => {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 26, 0, Math.PI * 2);
+        ctx.fillStyle = node.active ? 'rgba(56, 189, 248, 0.4)' : 'rgba(17, 24, 39, 0.8)';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = node.active ? '#38bdf8' : '#374151';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#9ca3af';
+        ctx.fill();
+    });
+
+    prismBeams.forEach(b => {
+        ctx.beginPath();
+        ctx.moveTo(b.currentX, b.currentY);
+        ctx.lineTo(centerX, centerY);
+        ctx.strokeStyle = b.ink.hex;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.35;
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+
+        ctx.beginPath();
+        ctx.arc(b.currentX, b.currentY, 12, 0, Math.PI * 2);
+        ctx.fillStyle = b.ink.hex;
+        ctx.fill();
+
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = b.word.hex;
+        ctx.textAlign = 'center';
+        ctx.fillText(b.word.name, b.currentX, b.currentY - 18);
+    });
+}
+
+function drawCups() {
+    cups.forEach(cup => {
+        if (cup.hasBall && cup.lift > 10) {
+            ctx.beginPath();
+            ctx.arc(cup.x, 475, 14, 0, Math.PI * 2);
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#38bdf8';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    });
+
+    cups.forEach(cup => {
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = cup.color;
+        const drawY = cup.y - cup.lift;
+
+        ctx.beginPath();
+        ctx.arc(cup.x, drawY, 32, Math.PI, 0, false);
+        ctx.closePath();
+
+        let strokeColor = cup.color;
+        if (subState === 'REVEALING') {
+            strokeColor = cup.hasBall ? '#34d399' : '#f87171';
+        }
+
+        ctx.fillStyle = 'rgba(17, 24, 39, 0.95)';
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = strokeColor;
+        ctx.stroke();
+        ctx.restore();
+    });
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
